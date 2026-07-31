@@ -19,9 +19,32 @@ function CheckQueueContent() {
   const [inputCode, setInputCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [isCopiedUrl, setIsCopiedUrl] = useState(false);
 
+  // Auto-search if ?code= or ?q= parameter is present in URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const codeFromUrl = params.get('code') || params.get('q') || params.get('search');
+      if (codeFromUrl && codeFromUrl.trim()) {
+        const cleanCode = codeFromUrl.trim();
+        setInputCode(cleanCode);
+        setSearchQuery(cleanCode);
+        setHasSearched(true);
+      }
+    }
+  }, []);
 
-
+  const handleCopyDirectUrl = (code: string) => {
+    if (typeof window === 'undefined') return;
+    const directUrl = `${window.location.origin}/check-queue?code=${encodeURIComponent(code)}`;
+    navigator.clipboard.writeText(directUrl);
+    setIsCopiedUrl(true);
+    toast.success(`📋 คัดลอกลิงก์ตรวจสอบคิว (${code}) เรียบร้อยแล้ว`);
+    setTimeout(() => {
+      setIsCopiedUrl(false);
+    }, 2000);
+  };
 
   const handleSearch = (e?: SyntheticEvent) => {
     if (e) e.preventDefault();
@@ -307,8 +330,27 @@ function CheckQueueContent() {
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     รหัสคิวของคุณ
                   </div>
-                  <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--primary-red-hover)', fontFamily: 'monospace', marginTop: '0.25rem' }}>
-                    {searchedItem.code}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--primary-red-hover)', fontFamily: 'monospace' }}>
+                      {searchedItem.code}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyDirectUrl(searchedItem.code)}
+                      title="คัดลอกลิงก์ตรวจสอบคิวนี้"
+                      style={{
+                        background: isCopiedUrl ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                        border: isCopiedUrl ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: 'var(--radius-sm)',
+                        color: isCopiedUrl ? '#22c55e' : 'var(--text-muted)',
+                        transition: 'all var(--transition-fast)'
+                      }}
+                    >
+                      {isCopiedUrl ? '✓ คัดลอกลิงก์แล้ว' : '📋 คัดลอกลิงก์'}
+                    </button>
                   </div>
                 </div>
 

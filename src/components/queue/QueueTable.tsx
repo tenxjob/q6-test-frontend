@@ -174,8 +174,12 @@ export function QueueTable() {
   };
 
   const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
+    const directUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/check-queue?code=${encodeURIComponent(code)}`
+      : `/check-queue?code=${encodeURIComponent(code)}`;
+    navigator.clipboard.writeText(directUrl);
     setCopiedCode(code);
+    toast.success(`📋 คัดลอกลิงก์ตรวจสอบคิว (${code}) เรียบร้อยแล้ว`);
     setTimeout(() => {
       setCopiedCode(null);
     }, 2000);
