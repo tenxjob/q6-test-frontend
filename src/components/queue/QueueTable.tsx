@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useGetQueues, sendWebSocketMessage, type QueueItem } from '../../service/apiQueue';
-import { useAddToListQueue, useUpdateListQueueStatus, useRemoveFromListQueue, useUpdateListQueueDetails } from '../../service/apiListQueue';
+import { toast } from 'sonner';
+import { useGetQueues, type QueueItem } from '../../service/apiQueue';
+import { useAddToListQueue, useUpdateListQueueStatus, useRemoveFromListQueue, useUpdateListQueueDetails, useToggleListQueueExpress, useToggleListQueueHold } from '../../service/apiListQueue';
 import { SendToQueueModal } from './SendToQueueModal';
 import { EditQueueModal } from './EditQueueModal';
 import { getFormattedChatUrl } from '../../utils/urlHelper';
@@ -56,6 +57,8 @@ export function QueueTable() {
   const updateStatusMutation = useUpdateListQueueStatus();
   const removeFromListMutation = useRemoveFromListQueue();
   const updateDetailsMutation = useUpdateListQueueDetails();
+  const toggleExpressMutation = useToggleListQueueExpress();
+  const toggleHoldMutation = useToggleListQueueHold();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterType>('pending_dispatch');
@@ -127,26 +130,8 @@ export function QueueTable() {
     );
   };
 
-  // Persistent express queue shortcut state
-  const [expressQueueIds, setExpressQueueIds] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('express_queue_ids');
-      if (saved) {
-        try { return JSON.parse(saved); } catch { return {}; }
-      }
-    }
-    return {};
-  });
-
-  const toggleExpressQueue = (id: string) => {
-    setExpressQueueIds(prev => {
-      const updated = { ...prev, [id]: !prev[id] };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('express_queue_ids', JSON.stringify(updated));
-      }
-      sendWebSocketMessage({ type: 'EXPRESS_QUEUE_UPDATED', expressQueueIds: updated });
-      return updated;
-    });
+  const toggleExpressQueue = (id: string, currentIsExpress: boolean) => {
+    toggleExpressMutation.mutate({ id, isExpress: !currentIsExpress });
   };
 
   // Close dropdown when clicking outside
@@ -163,65 +148,29 @@ export function QueueTable() {
     setOpenMenuId(prev => (prev === id ? null : id));
   };
 
-  // Persistent hold/problem queue state
-  const [holdQueueIds, setHoldQueueIds] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hold_queue_ids');
-      if (saved) {
-        try { return JSON.parse(saved); } catch { return {}; }
-      }
-    }
-    return {};
-  });
-
-  const toggleHoldQueue = (id: string) => {
-    setHoldQueueIds(prev => {
-      const updated = { ...prev, [id]: !prev[id] };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hold_queue_ids', JSON.stringify(updated));
-      }
-      sendWebSocketMessage({ type: 'HOLD_QUEUE_UPDATED', holdQueueIds: updated });
-      return updated;
-    });
+  const toggleHoldQueue = (id: string, currentIsHold: boolean) => {
+    toggleHoldMutation.mutate({ id, isHold: !currentIsHold });
   };
 
-  // Sync real-time express/hold queue updates from WebSocket custom events
-  useEffect(() => {
-    const handleExpressChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) setExpressQueueIds(customEvent.detail);
-    };
-    const handleHoldChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) setHoldQueueIds(customEvent.detail);
-    };
-
-    window.addEventListener('express_queue_changed', handleExpressChange);
-    window.addEventListener('hold_queue_changed', handleHoldChange);
-    return () => {
-      window.removeEventListener('express_queue_changed', handleExpressChange);
-      window.removeEventListener('hold_queue_changed', handleHoldChange);
-    };
-  }, []);
-
-
-  const handleDispatchQueue = (queueId: string) => {
-    addToListMutation.mutate({ queueId }, {
-      onSuccess: () => {
-        setAddedQueueIds(prev => ({ ...prev, [queueId]: true }));
-        setTimeout(() => {
-          setAddedQueueIds(prev => ({ ...prev, [queueId]: false }));
-        }, 3000);
-      },
-    });
-  };
 
   const handleUpdateStatus = (listQueueId: string, status: 'finished' | 'canceled') => {
-    updateStatusMutation.mutate({ id: listQueueId, status });
+    updateStatusMutation.mutate({ id: listQueueId, status }, {
+      onSuccess: () => {
+        if (status === 'finished') {
+          toast.success('✓ ให้บริการเสร็จสิ้นเรียบร้อยแล้ว');
+        } else {
+          toast.error('✕ ยกเลิกรายการคิวแล้ว');
+        }
+      }
+    });
   };
 
   const handleRemoveQueue = (listQueueId: string) => {
-    removeFromListMutation.mutate(listQueueId);
+    removeFromListMutation.mutate(listQueueId, {
+      onSuccess: () => {
+        toast.success('🗑️ ลบรายการเรียบร้อยแล้ว');
+      }
+    });
   };
 
   const handleCopyCode = (code: string) => {
@@ -259,7 +208,7 @@ export function QueueTable() {
 
     // 2. Status filter
     if (statusFilter === 'pending_dispatch') {
-      return q.listStatus === null || q.listStatus === undefined || q.listStatus === 'pending';
+      return q.listStatus === null || q.listStatus === undefined;
     }
     if (statusFilter === 'in_queue') {
       return q.listStatus === 'pending';
@@ -285,10 +234,8 @@ export function QueueTable() {
 
     if (statusFilter === 'in_queue') {
       return [...filteredQueues].sort((a, b) => {
-        const aKey = a.listQueueId || a.id;
-        const bKey = b.listQueueId || b.id;
-        const aHold = holdQueueIds[aKey] ? 1 : 0;
-        const bHold = holdQueueIds[bKey] ? 1 : 0;
+        const aHold = a.isHold ? 1 : 0;
+        const bHold = b.isHold ? 1 : 0;
         if (aHold !== bHold) {
           return aHold - bHold; // Normal (0) first, Hold (1) last
         }
@@ -299,9 +246,9 @@ export function QueueTable() {
     }
 
     return filteredQueues;
-  }, [filteredQueues, statusFilter, holdQueueIds]);
+  }, [filteredQueues, statusFilter]);
 
-  const pendingDispatchCount = queues?.filter(q => q.listStatus === null || q.listStatus === undefined || q.listStatus === 'pending').length || 0;
+  const pendingDispatchCount = queues?.filter(q => q.listStatus === null || q.listStatus === undefined).length || 0;
   const inQueueCount = queues?.filter(q => q.listStatus === 'pending').length || 0;
   const historyCount = queues?.filter(q => q.listStatus === 'finished' || q.listStatus === 'canceled').length || 0;
 
@@ -504,8 +451,8 @@ export function QueueTable() {
                   const isAdded = addedQueueIds[item.id];
                   const isCopied = copiedCode === item.code;
                   const queueKey = item.listQueueId || item.id;
-                  const isHold = statusFilter === 'in_queue' && !!holdQueueIds[queueKey];
-                  const isExpress = statusFilter === 'in_queue' && !!expressQueueIds[queueKey];
+                  const isHold = statusFilter === 'in_queue' && !!item.isHold;
+                  const isExpress = statusFilter === 'in_queue' && !!item.isExpress;
 
                   return (
                     <tr
@@ -700,7 +647,7 @@ export function QueueTable() {
                                     fontWeight: 600,
                                     cursor: 'pointer'
                                   }}
-                                  onClick={() => toggleHoldQueue(queueKey)}
+                                  onClick={() => toggleHoldQueue(queueKey, isHold)}
                                 >
                                   🔼 คืนคิว
                                 </button>
@@ -800,7 +747,7 @@ export function QueueTable() {
                                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                         onClick={() => {
                                           setOpenMenuId(null);
-                                          toggleExpressQueue(queueKey);
+                                          toggleExpressQueue(queueKey, isExpress);
                                         }}
                                       >
                                         {isExpress ? '🔒 ยกเลิกการลัดคิว' : '⚡ ลัดคิว (แสดงปุ่มยืนยัน)'}
@@ -876,7 +823,7 @@ export function QueueTable() {
                                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                         onClick={() => {
                                           setOpenMenuId(null);
-                                          toggleHoldQueue(queueKey);
+                                          toggleHoldQueue(queueKey, isHold);
                                         }}
                                       >
                                         ⚠️ พบปัญหา
@@ -936,8 +883,8 @@ export function QueueTable() {
               const isAdded = addedQueueIds[item.id];
               const isCopied = copiedCode === item.code;
               const queueKey = item.listQueueId || item.id;
-              const isHold = statusFilter === 'in_queue' && !!holdQueueIds[queueKey];
-              const isExpress = statusFilter === 'in_queue' && !!expressQueueIds[queueKey];
+              const isHold = statusFilter === 'in_queue' && !!item.isHold;
+              const isExpress = statusFilter === 'in_queue' && !!item.isExpress;
 
               return (
                 <div
@@ -1092,7 +1039,7 @@ export function QueueTable() {
                             fontWeight: 600,
                             cursor: 'pointer'
                           }}
-                          onClick={() => toggleHoldQueue(queueKey)}
+                          onClick={() => toggleHoldQueue(queueKey, isHold)}
                         >
                           🔼 คืนคิว
                         </button>
@@ -1146,7 +1093,7 @@ export function QueueTable() {
                                 fontWeight: 600,
                                 cursor: 'pointer'
                               }}
-                              onClick={() => toggleExpressQueue(queueKey)}
+                              onClick={() => toggleExpressQueue(queueKey, isExpress)}
                               title={isExpress ? 'ยกเลิกการลัดคิว' : 'ลัดคิว (แสดงปุ่มยืนยัน)'}
                             >
                               {isExpress ? '🔒' : '⚡'}
@@ -1164,7 +1111,7 @@ export function QueueTable() {
                                 fontWeight: 600,
                                 cursor: 'pointer'
                               }}
-                              onClick={() => toggleHoldQueue(queueKey)}
+                              onClick={() => toggleHoldQueue(queueKey, isHold)}
                               title="พบปัญหา"
                             >
                               ⚠️

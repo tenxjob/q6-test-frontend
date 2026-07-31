@@ -1,6 +1,7 @@
 ---
 import Header from '../ui/Header.astro';
 import Footer from '../ui/Footer.astro';
+import { Toaster } from 'sonner';
 import '../styles/global.css';
 
 interface Props {
@@ -30,5 +31,6 @@ const { title = 'QUEUE 6 - ระบบจัดการคิว' } = Astro.pr
       </main>
       <Footer />
     </div>
+    <Toaster client:only="react" position="top-right" richColors theme="dark" closeButton />
   </body>
 </html>

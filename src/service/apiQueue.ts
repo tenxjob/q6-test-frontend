@@ -9,6 +9,8 @@ export interface QueueItem {
   channel?: 'facebook' | 'line' | string | null;
   customerName?: string | null;
   url?: string | null;
+  isExpress?: boolean | null;
+  isHold?: boolean | null;
   createAt?: string;
   updateAt?: string;
   listCreatedAt?: string;
@@ -96,24 +98,9 @@ export function useQueueWebSocket() {
           try {
             const data = JSON.parse(event.data);
             if (data && data.type) {
-              if (data.type === 'EXPRESS_QUEUE_UPDATED' && data.expressQueueIds) {
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('express_queue_ids', JSON.stringify(data.expressQueueIds));
-                  window.dispatchEvent(new CustomEvent('express_queue_changed', { detail: data.expressQueueIds }));
-                }
-                return;
-              }
-
-              if (data.type === 'HOLD_QUEUE_UPDATED' && data.holdQueueIds) {
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('hold_queue_ids', JSON.stringify(data.holdQueueIds));
-                  window.dispatchEvent(new CustomEvent('hold_queue_changed', { detail: data.holdQueueIds }));
-                }
-                return;
-              }
-
-              // Invalidate queries only for real database mutation events
+              // Invalidate queries for all real database mutation events
               queryClient.invalidateQueries({ queryKey: ['queues'] });
+              queryClient.invalidateQueries({ queryKey: ['list-queues', 'pending'] });
             }
           } catch (e) {
             console.error('Failed to parse WebSocket message', e);
@@ -150,7 +137,8 @@ export function useGetQueues() {
   return useQuery({
     queryKey: ['queues'],
     queryFn: getQueues,
-    staleTime: 5000,
+    staleTime: 1000,
+    refetchInterval: 3000,
     retry: 2,
     retryDelay: 1000,
   });

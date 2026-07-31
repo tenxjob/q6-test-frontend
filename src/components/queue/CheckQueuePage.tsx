@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo, type SyntheticEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type SyntheticEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast, Toaster } from 'sonner';
 import { useGetQueues } from '../../service/apiQueue';
 import { getFormattedChatUrl } from '../../utils/urlHelper';
+import { playChimeSound } from '../../utils/soundHelper';
 
 const defaultQueryClient = new QueryClient({
   defaultOptions: {
@@ -18,46 +20,7 @@ function CheckQueueContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Persistent hold state
-  const [holdQueueIds, setHoldQueueIds] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hold_queue_ids');
-      if (saved) {
-        try { return JSON.parse(saved); } catch { return {}; }
-      }
-    }
-    return {};
-  });
 
-  // Persistent express/shortcut queue state
-  const [expressQueueIds, setExpressQueueIds] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('express_queue_ids');
-      if (saved) {
-        try { return JSON.parse(saved); } catch { return {}; }
-      }
-    }
-    return {};
-  });
-
-  // Sync real-time express/hold queue updates from WebSocket custom events
-  useEffect(() => {
-    const handleExpressChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) setExpressQueueIds(customEvent.detail);
-    };
-    const handleHoldChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) setHoldQueueIds(customEvent.detail);
-    };
-
-    window.addEventListener('express_queue_changed', handleExpressChange);
-    window.addEventListener('hold_queue_changed', handleHoldChange);
-    return () => {
-      window.removeEventListener('express_queue_changed', handleExpressChange);
-      window.removeEventListener('hold_queue_changed', handleHoldChange);
-    };
-  }, []);
 
 
   const handleSearch = (e?: SyntheticEvent) => {
@@ -82,10 +45,8 @@ function CheckQueueContent() {
     if (!queues) return [];
     const pendingList = queues.filter(q => q.listStatus === 'pending');
     return pendingList.sort((a, b) => {
-      const aKey = a.listQueueId || a.id;
-      const bKey = b.listQueueId || b.id;
-      const aHold = holdQueueIds[aKey] ? 1 : 0;
-      const bHold = holdQueueIds[bKey] ? 1 : 0;
+      const aHold = a.isHold ? 1 : 0;
+      const bHold = b.isHold ? 1 : 0;
       if (aHold !== bHold) {
         return aHold - bHold; // Normal (0) first, Hold (1) last
       }
@@ -93,16 +54,64 @@ function CheckQueueContent() {
       const timeB = b.updateAt ? new Date(b.updateAt).getTime() : (b.listCreatedAt ? new Date(b.listCreatedAt).getTime() : 0);
       return timeA - timeB;
     });
-  }, [queues, holdQueueIds]);
+  }, [queues]);
 
-  // Check if searched item is in express/shortcut mode (confirm button unlocked)
-  const searchedQueueKey = searchedItem ? (searchedItem.listQueueId || searchedItem.id) : '';
-  const isExpressMode = searchedQueueKey ? !!expressQueueIds[searchedQueueKey] : false;
+  // Check if searched item is in express/shortcut mode or hold mode
+  const isExpressMode = searchedItem ? !!searchedItem.isExpress : false;
+  const isHoldMode = searchedItem ? !!searchedItem.isHold : false;
 
   // Calculate live order position (If express mode is unlocked, position becomes 1 immediately!)
   const inQueuePosition = searchedItem && searchedItem.listStatus === 'pending'
     ? (isExpressMode ? 1 : sortedInQueueItems.findIndex(q => q.id === searchedItem.id) + 1)
     : null;
+
+  // Track previous rank position and hold status to prevent redundant toasts
+  const prevRankRef = useRef<number | null>(null);
+  const prevHoldRef = useRef<boolean>(false);
+
+  // Trigger Toast Notification when queue rank reaches 4, 3, 2, 1 OR when queue has a problem
+  useEffect(() => {
+    if (!searchedItem || searchedItem.listStatus !== 'pending' || inQueuePosition === null) {
+      prevRankRef.current = null;
+      prevHoldRef.current = false;
+      return;
+    }
+
+    // 1. If queue has a problem (isHoldMode === true): Notify urgent problem alert instead of queue rank!
+    if (isHoldMode) {
+      if (!prevHoldRef.current) {
+        toast.error('⚠️ พบปัญหาเกี่ยวกับคิวของคุณ!', {
+          description: `รหัสคิว ${searchedItem.code} มีปัญหา โปรดติดต่อแอดมินที่แชท ด่วน`,
+          duration: 10000,
+        });
+        playChimeSound('urgent');
+        prevHoldRef.current = true;
+      }
+      prevRankRef.current = null;
+      return;
+    }
+
+    // Reset hold tracking when hold status is removed
+    prevHoldRef.current = false;
+
+    // 2. Normal queue rank notification (4, 3, 2, 1)
+    if (prevRankRef.current !== inQueuePosition) {
+      if (inQueuePosition === 1) {
+        toast.success('🎉 ถึงคิวคุณแล้ว!', {
+          description: `รหัสคิว ${searchedItem.code} ถึงคิวแล้ว! กรุณาเข้ารับบริการที่เคาน์เตอร์`,
+          duration: 8000,
+        });
+        playChimeSound('current');
+      } else if (inQueuePosition >= 2 && inQueuePosition <= 4) {
+        toast.warning(`🔔 ใกล้ถึงคิวคุณแล้ว! (ลำดับที่ ${inQueuePosition})`, {
+          description: `รหัสคิว ${searchedItem.code} อีกเพียง ${inQueuePosition - 1} คิวจะถึงคิวของคุณแล้ว กรุณาเตรียมพร้อม`,
+          duration: 6000,
+        });
+        playChimeSound('near');
+      }
+      prevRankRef.current = inQueuePosition;
+    }
+  }, [inQueuePosition, searchedItem, isHoldMode]);
 
 
 
@@ -181,6 +190,64 @@ function CheckQueueContent() {
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
           💡 ใส่รหัสคิว เช่น <strong style={{ color: 'var(--primary-red-hover)' }}>Q001</strong> หรือชื่อบริการเพื่อตรวจสอบ
         </p>
+
+        {/* Sound Test Controls */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '0.65rem',
+          flexWrap: 'wrap',
+          width: '100%',
+          paddingTop: '0.5rem',
+          borderTop: '1px solid var(--border-color)'
+        }}>
+          <button
+            type="button"
+            onClick={() => {
+              playChimeSound('near');
+              toast.warning('🔔 ทดสอบเสียง: ใกล้ถึงคิวคุณแล้ว!');
+            }}
+            style={{
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              backgroundColor: 'rgba(234, 179, 8, 0.12)',
+              color: '#eab308',
+              border: '1px solid rgba(234, 179, 8, 0.3)',
+              borderRadius: 'var(--radius-full)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              transition: 'transform var(--transition-fast)'
+            }}
+          >
+            🔊 ทดสอบเสียง "ใกล้ถึงคิว"
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playChimeSound('current');
+              toast.success('🎉 ทดสอบเสียง: ถึงคิวคุณแล้ว!');
+            }}
+            style={{
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              backgroundColor: 'rgba(34, 197, 94, 0.12)',
+              color: '#22c55e',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              borderRadius: 'var(--radius-full)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              transition: 'transform var(--transition-fast)'
+            }}
+          >
+            🔊 ทดสอบเสียง "ถึงคิวแล้ว"
+          </button>
+        </div>
       </div>
 
       {/* Results Section */}
@@ -220,8 +287,7 @@ function CheckQueueContent() {
           const isFinished = searchedItem.listStatus === 'finished';
           const isCanceled = searchedItem.listStatus === 'canceled';
           const isInQueue = searchedItem.listStatus === 'pending';
-          const queueKey = searchedItem.listQueueId || searchedItem.id;
-          const isHold = holdQueueIds[queueKey];
+          const isHold = !!searchedItem.isHold;
 
           return (
             <div className="card" style={{
@@ -408,6 +474,7 @@ export function CheckQueuePage() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster position="top-right" richColors theme="dark" closeButton />
       <CheckQueueContent />
     </QueryClientProvider>
   );

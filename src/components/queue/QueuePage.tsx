@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 import { QueueTable } from './QueueTable';
 import { AddQueueModal } from './AddQueueModal';
 
@@ -20,7 +21,7 @@ function QueuePageContent() {
       {/* Header Section */}
       <div style={{
         display: 'flex',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: '1rem',
@@ -30,9 +31,6 @@ function QueuePageContent() {
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>
             จัดการคิว
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.2rem' }}>
-            รายชื่อผู้ใช้งานและคิวในระบบ
-          </p>
         </div>
         <button
           className="btn-primary"
@@ -67,6 +65,7 @@ export function QueuePage() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster position="top-right" richColors theme="dark" closeButton />
       <QueuePageContent />
     </QueryClientProvider>
   );

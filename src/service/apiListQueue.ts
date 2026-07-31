@@ -7,6 +7,8 @@ export interface ListQueueItem {
   channel?: 'facebook' | 'line' | string | null;
   customerName?: string | null;
   url?: string | null;
+  isExpress: boolean;
+  isHold: boolean;
   createdAt: string;
   updatedAt: string;
   queueName: string;
@@ -184,6 +186,48 @@ export function useUpdateListQueueDetails() {
       queryClient.invalidateQueries({ queryKey: ['queues'] });
       queryClient.invalidateQueries({ queryKey: ['list-queues', 'pending'] });
       queryClient.invalidateQueries({ queryKey: ['list-queues', 'history'] });
+    },
+  });
+}
+
+export async function toggleListQueueExpress(id: string, isExpress: boolean): Promise<ListQueueItem> {
+  const response = await fetch(`${API_BASE_URL}/list-queues/${id}/express`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isExpress }),
+  });
+  if (!response.ok) throw new Error('Failed to update express status');
+  return response.json();
+}
+
+export async function toggleListQueueHold(id: string, isHold: boolean): Promise<ListQueueItem> {
+  const response = await fetch(`${API_BASE_URL}/list-queues/${id}/hold`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isHold }),
+  });
+  if (!response.ok) throw new Error('Failed to update hold status');
+  return response.json();
+}
+
+export function useToggleListQueueExpress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isExpress }: { id: string; isExpress: boolean }) => toggleListQueueExpress(id, isExpress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queues'] });
+      queryClient.invalidateQueries({ queryKey: ['list-queues', 'pending'] });
+    },
+  });
+}
+
+export function useToggleListQueueHold() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isHold }: { id: string; isHold: boolean }) => toggleListQueueHold(id, isHold),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queues'] });
+      queryClient.invalidateQueries({ queryKey: ['list-queues', 'pending'] });
     },
   });
 }
