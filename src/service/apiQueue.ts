@@ -6,6 +6,9 @@ export interface QueueItem {
   name: string;
   price: number;
   code: string;
+  channel?: 'facebook' | 'line' | string | null;
+  customerName?: string | null;
+  url?: string | null;
   createAt?: string;
   updateAt?: string;
   listCreatedAt?: string;
@@ -41,7 +44,12 @@ export async function createQueue(data: CreateQueueInput): Promise<QueueItem> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create queue: ${response.statusText}`);
+    let errorMsg = response.statusText;
+    try {
+      const errBody = await response.json();
+      if (errBody?.message) errorMsg = errBody.message;
+    } catch {}
+    throw new Error(`Failed to create queue: ${errorMsg}`);
   }
 
   return response.json();
@@ -62,6 +70,10 @@ export function useQueueWebSocket() {
     let reconnectTimeout: ReturnType<typeof setTimeout>;
 
     function connect() {
+      if (socketInstance && (socketInstance.readyState === WebSocket.OPEN || socketInstance.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
       try {
         const ws = new WebSocket(WS_URL);
         socketInstance = ws;
@@ -79,6 +91,7 @@ export function useQueueWebSocket() {
                   localStorage.setItem('express_queue_ids', JSON.stringify(data.expressQueueIds));
                   window.dispatchEvent(new CustomEvent('express_queue_changed', { detail: data.expressQueueIds }));
                 }
+                return;
               }
 
               if (data.type === 'HOLD_QUEUE_UPDATED' && data.holdQueueIds) {
@@ -86,8 +99,10 @@ export function useQueueWebSocket() {
                   localStorage.setItem('hold_queue_ids', JSON.stringify(data.holdQueueIds));
                   window.dispatchEvent(new CustomEvent('hold_queue_changed', { detail: data.holdQueueIds }));
                 }
+                return;
               }
 
+              // Invalidate queries only for real database mutation events
               queryClient.invalidateQueries({ queryKey: ['queues'] });
             }
           } catch (e) {
@@ -97,14 +112,16 @@ export function useQueueWebSocket() {
 
         ws.onclose = () => {
           socketInstance = null;
-          reconnectTimeout = setTimeout(connect, 3000);
+          reconnectTimeout = setTimeout(connect, 5000);
         };
 
         ws.onerror = () => {
-          ws?.close();
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
         };
       } catch (err) {
-        reconnectTimeout = setTimeout(connect, 3000);
+        reconnectTimeout = setTimeout(connect, 5000);
       }
     }
 
@@ -112,11 +129,6 @@ export function useQueueWebSocket() {
 
     return () => {
       clearTimeout(reconnectTimeout);
-      if (socketInstance) {
-        socketInstance.onclose = null;
-        socketInstance.close();
-        socketInstance = null;
-      }
     };
   }, [queryClient]);
 }
@@ -128,7 +140,7 @@ export function useGetQueues() {
   return useQuery({
     queryKey: ['queues'],
     queryFn: getQueues,
-    staleTime: 0,
+    staleTime: 5000,
   });
 }
 

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useGetQueues, sendWebSocketMessage } from '../../service/apiQueue';
-import { useAddToListQueue, useUpdateListQueueStatus, useRemoveFromListQueue } from '../../service/apiListQueue';
+import { useGetQueues, sendWebSocketMessage, type QueueItem } from '../../service/apiQueue';
+import { useAddToListQueue, useUpdateListQueueStatus, useRemoveFromListQueue, useUpdateListQueueDetails } from '../../service/apiListQueue';
+import { SendToQueueModal } from './SendToQueueModal';
+import { EditQueueModal } from './EditQueueModal';
+import { getFormattedChatUrl } from '../../utils/urlHelper';
 
 type FilterType = 'pending_dispatch' | 'in_queue' | 'history';
 
@@ -52,12 +55,77 @@ export function QueueTable() {
   const addToListMutation = useAddToListQueue();
   const updateStatusMutation = useUpdateListQueueStatus();
   const removeFromListMutation = useRemoveFromListQueue();
+  const updateDetailsMutation = useUpdateListQueueDetails();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterType>('pending_dispatch');
   const [addedQueueIds, setAddedQueueIds] = useState<Record<string, boolean>>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Dispatch modal state
+  const [selectedDispatchItem, setSelectedDispatchItem] = useState<QueueItem | null>(null);
+  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
+
+  // Edit modal state
+  const [selectedEditItem, setSelectedEditItem] = useState<QueueItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const handleOpenEditModal = (item: QueueItem) => {
+    setSelectedEditItem(item);
+    setIsEditModalOpen(true);
+  };
+
+  const handleConfirmEdit = ({
+    listQueueId,
+    channel,
+    url,
+  }: {
+    listQueueId: string;
+    channel: string;
+    url: string;
+  }) => {
+    updateDetailsMutation.mutate(
+      { id: listQueueId, channel, url },
+      {
+        onSuccess: () => {
+          setIsEditModalOpen(false);
+          setSelectedEditItem(null);
+        },
+      }
+    );
+  };
+
+  const handleOpenDispatchModal = (item: QueueItem) => {
+    setSelectedDispatchItem(item);
+    setIsDispatchModalOpen(true);
+  };
+
+  const handleConfirmDispatch = ({
+    queueId,
+    channel,
+    customerName,
+    url,
+  }: {
+    queueId: string;
+    channel: string;
+    customerName?: string;
+    url: string;
+  }) => {
+    addToListMutation.mutate(
+      { queueId, channel, customerName, url },
+      {
+        onSuccess: () => {
+          setAddedQueueIds(prev => ({ ...prev, [queueId]: true }));
+          setIsDispatchModalOpen(false);
+          setSelectedDispatchItem(null);
+          setTimeout(() => {
+            setAddedQueueIds(prev => ({ ...prev, [queueId]: false }));
+          }, 3000);
+        },
+      }
+    );
+  };
 
   // Persistent express queue shortcut state
   const [expressQueueIds, setExpressQueueIds] = useState<Record<string, boolean>>(() => {
@@ -138,7 +206,7 @@ export function QueueTable() {
 
 
   const handleDispatchQueue = (queueId: string) => {
-    addToListMutation.mutate(queueId, {
+    addToListMutation.mutate({ queueId }, {
       onSuccess: () => {
         setAddedQueueIds(prev => ({ ...prev, [queueId]: true }));
         setTimeout(() => {
@@ -381,6 +449,9 @@ export function QueueTable() {
                 }}>
                   <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>ลำดับ</th>
                   <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>ชื่อ</th>
+                  {statusFilter === 'in_queue' && (
+                    <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>ช่องทาง</th>
+                  )}
                   <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>รหัสคิว</th>
                   {statusFilter === 'in_queue' && (
                     <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>เวลาในการดำเนินการ</th>
@@ -406,23 +477,114 @@ export function QueueTable() {
                       key={item.id}
                       style={{
                         borderBottom: '1px solid var(--border-color)',
-                        backgroundColor: isHold ? 'rgba(249, 115, 22, 0.06)' : 'transparent',
-                        transition: 'background-color var(--transition-fast)'
+                        backgroundColor: isExpress
+                          ? 'rgba(234, 179, 8, 0.12)'
+                          : isHold
+                          ? 'rgba(249, 115, 22, 0.06)'
+                          : 'transparent',
+                        borderLeft: isExpress
+                          ? '4px solid #f59e0b'
+                          : isHold
+                          ? '4px solid #f97316'
+                          : '4px solid transparent',
+                        transition: 'all var(--transition-fast)'
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isHold ? 'rgba(249, 115, 22, 0.12)' : 'var(--bg-surface-hover)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isHold ? 'rgba(249, 115, 22, 0.06)' : 'transparent')}
+                      onMouseEnter={(e) => (
+                        e.currentTarget.style.backgroundColor = isExpress
+                          ? 'rgba(234, 179, 8, 0.2)'
+                          : isHold
+                          ? 'rgba(249, 115, 22, 0.12)'
+                          : 'var(--bg-surface-hover)'
+                      )}
+                      onMouseLeave={(e) => (
+                        e.currentTarget.style.backgroundColor = isExpress
+                          ? 'rgba(234, 179, 8, 0.12)'
+                          : isHold
+                          ? 'rgba(249, 115, 22, 0.06)'
+                          : 'transparent'
+                      )}
                     >
                       <td style={{
                         padding: '0.85rem 1.25rem',
                         fontWeight: 700,
                         fontSize: '0.9rem',
-                        color: 'var(--text-main)'
+                        color: isExpress ? '#fbbf24' : 'var(--text-main)'
                       }}>
                         {index + 1}
                       </td>
                       <td style={{ padding: '0.85rem 1.25rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                        {item.name}
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span>{item.name}</span>
+                          {isExpress && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.15rem 0.55rem',
+                              borderRadius: '12px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              backgroundColor: 'rgba(245, 158, 11, 0.22)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(251, 191, 36, 0.5)',
+                              boxShadow: '0 0 10px rgba(245, 158, 11, 0.35)',
+                              letterSpacing: '0.3px',
+                            }}>
+                              ⚡ ลัดคิว
+                            </span>
+                          )}
+                        </div>
                       </td>
+                      {statusFilter === 'in_queue' && (
+                        <td style={{ padding: '0.85rem 1.25rem' }}>
+                          {item.channel ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <img
+                                src={
+                                  item.channel.toLowerCase() === 'facebook'
+                                    ? 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSXoMFtNYy-gfuvVnQkKSiDAmfYt0ynmaGz55WPNbUPZw&s'
+                                    : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTyPW5ubRuhtFZJy7-9e24kQSydAiPV_RYswFcWxYiHgw&s'
+                                }
+                                alt={item.channel}
+                                style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover' }}
+                              />
+                              <span style={{
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                color: item.channel.toLowerCase() === 'line' ? '#4ade80' : '#60a5fa'
+                              }}>
+                                {item.channel.toLowerCase() === 'line' ? 'Line' : 'Facebook'}
+                              </span>
+                              <span style={{ color: 'var(--text-muted)' }}>-</span>
+                              <a
+                                href={getFormattedChatUrl(item.url, item.channel)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: '8px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  backgroundColor: item.channel.toLowerCase() === 'line' ? 'rgba(6, 199, 85, 0.2)' : 'rgba(24, 119, 242, 0.2)',
+                                  color: item.channel.toLowerCase() === 'line' ? '#4ade80' : '#60a5fa',
+                                  border: item.channel.toLowerCase() === 'line' ? '1px solid rgba(6, 199, 85, 0.4)' : '1px solid rgba(24, 119, 242, 0.4)',
+                                  textDecoration: 'none',
+                                  transition: 'all 0.2s ease',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                }}
+                              >
+                                เปิดแชท ↗
+                              </a>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>-</span>
+                          )}
+                        </td>
+                      )}
                       <td style={{ padding: '0.85rem 1.25rem' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                           <span style={{ color: 'var(--primary-red-hover)', fontWeight: 600 }}>
@@ -512,19 +674,23 @@ export function QueueTable() {
                                   {(index === 0 || isExpress) && (
                                     <button
                                       style={{
-                                        padding: '0.35rem 0.65rem',
+                                        padding: '0.35rem 0.75rem',
                                         fontSize: '0.75rem',
-                                        backgroundColor: '#22c55e',
+                                        backgroundColor: isExpress ? '#16a34a' : '#22c55e',
                                         color: '#ffffff',
-                                        border: 'none',
+                                        border: isExpress ? '1px solid rgba(255, 255, 255, 0.3)' : 'none',
                                         borderRadius: 'var(--radius-sm)',
-                                        fontWeight: 600,
-                                        cursor: 'pointer'
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        boxShadow: isExpress ? '0 0 12px rgba(34, 197, 94, 0.45)' : 'none',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
                                       }}
                                       disabled={updateStatusMutation.isPending}
                                       onClick={() => item.listQueueId && handleUpdateStatus(item.listQueueId, 'finished')}
                                     >
-                                      ✓ ยืนยัน
+                                      {isExpress ? '⚡ ✓ ยืนยันด่วน' : '✓ ยืนยัน'}
                                     </button>
                                   )}
                                   <button
@@ -634,6 +800,32 @@ export function QueueTable() {
                                       ↩️ ถอดคิว
                                     </button>
 
+                                    {item.listQueueId && (
+                                      <button
+                                        style={{
+                                          padding: '0.5rem 0.85rem',
+                                          fontSize: '0.8rem',
+                                          textAlign: 'left',
+                                          background: 'transparent',
+                                          border: 'none',
+                                          color: '#60a5fa',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.4rem',
+                                          transition: 'background-color var(--transition-fast)'
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          handleOpenEditModal(item);
+                                        }}
+                                      >
+                                        ✏️ แก้ไขช่องทาง / URL
+                                      </button>
+                                    )}
+
                                     {!isHold && (
                                       <button
                                         style={{
@@ -688,7 +880,10 @@ export function QueueTable() {
                               backgroundColor: isAdded ? '#22c55e' : 'var(--primary-red)'
                             }}
                             disabled={addToListMutation.isPending}
-                            onClick={() => handleDispatchQueue(item.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDispatchModal(item);
+                            }}
                           >
                             {isAdded ? '✓ ส่งเข้าคิวแล้ว' : '+ ส่งเข้าคิว'}
                           </button>
@@ -778,12 +973,59 @@ export function QueueTable() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
                     <div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>ชื่อ</div>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>{item.name}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>
+                        {item.name}
+                      </div>
                     </div>
                     <div>
                       <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>ราคา</div>
                       <div style={{ fontWeight: 600, color: 'var(--text-main)', marginTop: '0.1rem' }}>฿{item.price.toLocaleString()}</div>
                     </div>
+                    {statusFilter === 'in_queue' && (
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.2rem' }}>ช่องทาง</div>
+                        {item.channel ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <img
+                              src={
+                                item.channel.toLowerCase() === 'facebook'
+                                  ? 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSXoMFtNYy-gfuvVnQkKSiDAmfYt0ynmaGz55WPNbUPZw&s'
+                                  : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTyPW5ubRuhtFZJy7-9e24kQSydAiPV_RYswFcWxYiHgw&s'
+                              }
+                              alt={item.channel}
+                              style={{ width: '16px', height: '16px', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: item.channel.toLowerCase() === 'line' ? '#4ade80' : '#60a5fa' }}>
+                              {item.channel.toLowerCase() === 'line' ? 'Line' : 'Facebook'}
+                            </span>
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                            <a
+                              href={getFormattedChatUrl(item.url, item.channel)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                backgroundColor: item.channel.toLowerCase() === 'line' ? 'rgba(6, 199, 85, 0.2)' : 'rgba(24, 119, 242, 0.2)',
+                                color: item.channel.toLowerCase() === 'line' ? '#4ade80' : '#60a5fa',
+                                border: item.channel.toLowerCase() === 'line' ? '1px solid rgba(6, 199, 85, 0.4)' : '1px solid rgba(24, 119, 242, 0.4)',
+                                textDecoration: 'none',
+                              }}
+                            >
+                              เปิดแชท ↗
+                            </a>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>-</span>
+                        )}
+                      </div>
+                    )}
                     {statusFilter === 'in_queue' && (
                       <div style={{ gridColumn: 'span 2' }}>
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '0.25rem' }}>เวลาในการดำเนินการ</div>
@@ -914,7 +1156,10 @@ export function QueueTable() {
                           backgroundColor: isAdded ? '#22c55e' : 'var(--primary-red)'
                         }}
                         disabled={addToListMutation.isPending}
-                        onClick={() => handleDispatchQueue(item.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDispatchModal(item);
+                        }}
                       >
                         {isAdded ? '✓ ส่งเข้าคิวแล้ว' : '+ ส่งเข้าคิว'}
                       </button>
@@ -926,6 +1171,30 @@ export function QueueTable() {
           </div>
         </>
       )}
+
+      {/* Dispatch Modal Popup */}
+      <SendToQueueModal
+        isOpen={isDispatchModalOpen}
+        item={selectedDispatchItem}
+        onClose={() => {
+          setIsDispatchModalOpen(false);
+          setSelectedDispatchItem(null);
+        }}
+        onConfirm={handleConfirmDispatch}
+        isPending={addToListMutation.isPending}
+      />
+
+      {/* Edit Channel/URL Modal Popup */}
+      <EditQueueModal
+        isOpen={isEditModalOpen}
+        item={selectedEditItem}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedEditItem(null);
+        }}
+        onConfirm={handleConfirmEdit}
+        isPending={updateDetailsMutation.isPending}
+      />
     </div>
   );
 }

@@ -37,7 +37,7 @@ function QueuePageContent() {
       </div>
 
       {/* Queue Table Card */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0 }}>
         <QueueTable />
       </div>
 

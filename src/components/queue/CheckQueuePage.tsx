@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, type SyntheticEvent } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useGetQueues } from '../../service/apiQueue';
+import { getFormattedChatUrl } from '../../utils/urlHelper';
 
 const defaultQueryClient = new QueryClient({
   defaultOptions: {
@@ -330,9 +331,46 @@ function CheckQueueContent() {
               {/* Grid Details */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ชื่อ</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.2rem' }}>
-                    {searchedItem.name}
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>รายการ / ช่องทางสนทนา</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <span>{searchedItem.name}</span>
+                    {searchedItem.channel && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                        <img
+                          src={
+                            searchedItem.channel.toLowerCase() === 'facebook'
+                              ? 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSXoMFtNYy-gfuvVnQkKSiDAmfYt0ynmaGz55WPNbUPZw&s'
+                              : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTyPW5ubRuhtFZJy7-9e24kQSydAiPV_RYswFcWxYiHgw&s'
+                          }
+                          alt={searchedItem.channel}
+                          style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                        <span style={{ fontWeight: 600, color: searchedItem.channel.toLowerCase() === 'line' ? '#4ade80' : '#60a5fa' }}>
+                          {searchedItem.channel.toLowerCase() === 'line' ? 'Line' : 'Facebook'}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                        <a
+                          href={getFormattedChatUrl(searchedItem.url, searchedItem.channel, true)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor: searchedItem.channel.toLowerCase() === 'line' ? 'rgba(6, 199, 85, 0.2)' : 'rgba(24, 119, 242, 0.2)',
+                            color: searchedItem.channel.toLowerCase() === 'line' ? '#4ade80' : '#60a5fa',
+                            border: searchedItem.channel.toLowerCase() === 'line' ? '1px solid rgba(6, 199, 85, 0.4)' : '1px solid rgba(24, 119, 242, 0.4)',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          เปิดแชท ↗
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
 

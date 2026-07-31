@@ -4,6 +4,9 @@ export interface ListQueueItem {
   id: string;
   queueId: string;
   status: 'pending' | 'finished' | 'canceled';
+  channel?: 'facebook' | 'line' | string | null;
+  customerName?: string | null;
+  url?: string | null;
   createdAt: string;
   updatedAt: string;
   queueName: string;
@@ -29,14 +32,26 @@ export async function getHistoryListQueues(): Promise<ListQueueItem[]> {
   return response.json();
 }
 
-export async function addToListQueue(queueId: string): Promise<ListQueueItem> {
+export interface AddToListQueuePayload {
+  queueId: string;
+  channel?: string;
+  customerName?: string;
+  url?: string;
+}
+
+export async function addToListQueue(payload: AddToListQueuePayload): Promise<ListQueueItem> {
   const response = await fetch(`${API_BASE_URL}/list-queues`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ queueId }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error(`Failed to dispatch queue: ${response.statusText}`);
+    let errorMsg = response.statusText;
+    try {
+      const errBody = await response.json();
+      if (errBody?.message) errorMsg = errBody.message;
+    } catch {}
+    throw new Error(`Failed to dispatch queue: ${errorMsg}`);
   }
   return response.json();
 }
@@ -108,6 +123,41 @@ export function useRemoveFromListQueue() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: removeFromListQueue,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queues'] });
+      queryClient.invalidateQueries({ queryKey: ['list-queues', 'pending'] });
+      queryClient.invalidateQueries({ queryKey: ['list-queues', 'history'] });
+    },
+  });
+}
+
+export async function updateListQueueDetails(
+  id: string,
+  payload: { channel?: string; url?: string }
+): Promise<ListQueueItem> {
+  const response = await fetch(`${API_BASE_URL}/list-queues/${id}/details`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorMsg = response.statusText;
+    try {
+      const errBody = await response.json();
+      if (errBody?.message) errorMsg = errBody.message;
+    } catch {}
+    throw new Error(`Failed to update details: ${errorMsg}`);
+  }
+
+  return response.json();
+}
+
+export function useUpdateListQueueDetails() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, channel, url }: { id: string; channel?: string; url?: string }) =>
+      updateListQueueDetails(id, { channel, url }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['queues'] });
       queryClient.invalidateQueries({ queryKey: ['list-queues', 'pending'] });
