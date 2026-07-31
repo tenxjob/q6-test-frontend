@@ -1,0 +1,36 @@
+---
+const pathname = Astro.url.pathname;
+const isQueue = pathname === '/queue' || pathname === '/queue/' || pathname === '/';
+const isCheckQueue = pathname.startsWith('/check-queue');
+---
+
+<header class="app-header">
+    <div class="header-container">
+        <a href="/queue" class="header-brand">
+            <span class="brand-dot"></span>
+            <span>QUEUE<span style="color: var(--primary-red)">6</span></span>
+        </a>
+
+        <nav class="header-nav">
+            <a 
+                href="/queue" 
+                class={`nav-link ${isQueue ? "active" : ""}`}
+            >
+                จัดการคิว
+            </a>
+            <a 
+                href="/check-queue" 
+                class={`nav-link ${isCheckQueue ? "active" : ""}`}
+            >
+                ตรวจสอบคิว
+            </a>
+        </nav>
+
+        <div class="header-actions">
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span>พร้อมใช้งาน</span>
+            </div>
+        </div>
+    </div>
+</header>
