@@ -18,21 +18,33 @@ function QueuePageContent() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header Section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{
+        display: 'flex',
+        justify: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        padding: '0 0.25rem'
+      }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>
             จัดการคิว
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.2rem' }}>
             รายชื่อผู้ใช้งานและคิวในระบบ
           </p>
         </div>
         <button
           className="btn-primary"
           onClick={() => setIsModalOpen(true)}
-          style={{ whiteSpace: 'nowrap' }}
+          style={{
+            whiteSpace: 'nowrap',
+            padding: '0.7rem 1.35rem',
+            fontSize: '0.9rem',
+            borderRadius: 'var(--radius-md)'
+          }}
         >
-          + เพิ่มรายการจาก Payment Gateway (จำลอง)
+          <span>⚡</span> + เพิ่มรายการจาก Payment Gateway (จำลอง)
         </button>
       </div>
 

@@ -352,24 +352,59 @@ export function QueueTable() {
         gap: '1rem',
         backgroundColor: 'var(--bg-surface)'
       }}>
-        {/* Search Input */}
-        <input
-          type="text"
-          placeholder="ค้นหาตามชื่อ หรือ รหัสคิว..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            backgroundColor: 'var(--bg-main)',
-            border: '1px solid var(--border-color)',
-            color: 'var(--text-main)',
-            padding: '0.5rem 0.85rem',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.875rem',
-            width: '100%',
-            maxWidth: '280px',
-            outline: 'none'
-          }}
-        />
+        {/* Search Input Box */}
+        <div style={{ position: 'relative', width: '100%', maxWidth: '320px', flex: '1 1 240px' }}>
+          <span style={{
+            position: 'absolute',
+            left: '0.85rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--text-muted)',
+            fontSize: '0.85rem',
+            pointerEvents: 'none'
+          }}>
+            🔍
+          </span>
+          <input
+            type="text"
+            placeholder="ค้นหาตามชื่อ หรือ รหัสคิว..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              backgroundColor: 'var(--bg-main)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-main)',
+              padding: '0.55rem 2.2rem 0.55rem 2.4rem',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.875rem',
+              width: '100%',
+              outline: 'none',
+              transition: 'all var(--transition-fast)',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)'
+            }}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--primary-red)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--border-color)')}
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                padding: '0.2rem'
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
         {/* Filter Tabs */}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -469,8 +504,8 @@ export function QueueTable() {
                   const isAdded = addedQueueIds[item.id];
                   const isCopied = copiedCode === item.code;
                   const queueKey = item.listQueueId || item.id;
-                  const isHold = holdQueueIds[queueKey];
-                  const isExpress = expressQueueIds[queueKey];
+                  const isHold = statusFilter === 'in_queue' && !!holdQueueIds[queueKey];
+                  const isExpress = statusFilter === 'in_queue' && !!expressQueueIds[queueKey];
 
                   return (
                     <tr
@@ -480,28 +515,28 @@ export function QueueTable() {
                         backgroundColor: isExpress
                           ? 'rgba(234, 179, 8, 0.12)'
                           : isHold
-                          ? 'rgba(249, 115, 22, 0.06)'
-                          : 'transparent',
+                            ? 'rgba(249, 115, 22, 0.06)'
+                            : 'transparent',
                         borderLeft: isExpress
                           ? '4px solid #f59e0b'
                           : isHold
-                          ? '4px solid #f97316'
-                          : '4px solid transparent',
+                            ? '4px solid #f97316'
+                            : '4px solid transparent',
                         transition: 'all var(--transition-fast)'
                       }}
                       onMouseEnter={(e) => (
                         e.currentTarget.style.backgroundColor = isExpress
                           ? 'rgba(234, 179, 8, 0.2)'
                           : isHold
-                          ? 'rgba(249, 115, 22, 0.12)'
-                          : 'var(--bg-surface-hover)'
+                            ? 'rgba(249, 115, 22, 0.12)'
+                            : 'var(--bg-surface-hover)'
                       )}
                       onMouseLeave={(e) => (
                         e.currentTarget.style.backgroundColor = isExpress
                           ? 'rgba(234, 179, 8, 0.12)'
                           : isHold
-                          ? 'rgba(249, 115, 22, 0.06)'
-                          : 'transparent'
+                            ? 'rgba(249, 115, 22, 0.06)'
+                            : 'transparent'
                       )}
                     >
                       <td style={{
@@ -674,23 +709,19 @@ export function QueueTable() {
                                   {(index === 0 || isExpress) && (
                                     <button
                                       style={{
-                                        padding: '0.35rem 0.75rem',
+                                        padding: '0.35rem 0.65rem',
                                         fontSize: '0.75rem',
-                                        backgroundColor: isExpress ? '#16a34a' : '#22c55e',
+                                        backgroundColor: '#22c55e',
                                         color: '#ffffff',
-                                        border: isExpress ? '1px solid rgba(255, 255, 255, 0.3)' : 'none',
+                                        border: 'none',
                                         borderRadius: 'var(--radius-sm)',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        boxShadow: isExpress ? '0 0 12px rgba(34, 197, 94, 0.45)' : 'none',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.25rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
                                       }}
                                       disabled={updateStatusMutation.isPending}
                                       onClick={() => item.listQueueId && handleUpdateStatus(item.listQueueId, 'finished')}
                                     >
-                                      {isExpress ? '⚡ ✓ ยืนยันด่วน' : '✓ ยืนยัน'}
+                                      ✓ ยืนยัน
                                     </button>
                                   )}
                                   <button
@@ -772,7 +803,7 @@ export function QueueTable() {
                                           toggleExpressQueue(queueKey);
                                         }}
                                       >
-                                        {isExpress ? '🔒 ซ่อนปุ่มยืนยัน' : '⚡ ลัดคิว (แสดงปุ่มยืนยัน)'}
+                                        {isExpress ? '🔒 ยกเลิกการลัดคิว' : '⚡ ลัดคิว (แสดงปุ่มยืนยัน)'}
                                       </button>
                                     )}
 
@@ -905,21 +936,30 @@ export function QueueTable() {
               const isAdded = addedQueueIds[item.id];
               const isCopied = copiedCode === item.code;
               const queueKey = item.listQueueId || item.id;
-              const isHold = holdQueueIds[queueKey];
-              const isExpress = expressQueueIds[queueKey];
+              const isHold = statusFilter === 'in_queue' && !!holdQueueIds[queueKey];
+              const isExpress = statusFilter === 'in_queue' && !!expressQueueIds[queueKey];
 
               return (
                 <div
                   key={item.id}
                   style={{
-                    backgroundColor: isHold ? 'rgba(249, 115, 22, 0.08)' : 'var(--bg-surface)',
-                    border: isHold ? '1px solid rgba(249, 115, 22, 0.4)' : '1px solid var(--border-color)',
+                    backgroundColor: isExpress
+                      ? 'rgba(234, 179, 8, 0.12)'
+                      : isHold
+                        ? 'rgba(249, 115, 22, 0.08)'
+                        : 'var(--bg-surface)',
+                    border: isExpress
+                      ? '1px solid rgba(251, 191, 36, 0.5)'
+                      : isHold
+                        ? '1px solid rgba(249, 115, 22, 0.4)'
+                        : '1px solid var(--border-color)',
+                    borderLeft: isExpress ? '4px solid #f59e0b' : isHold ? '4px solid #f97316' : '1px solid var(--border-color)',
                     borderRadius: 'var(--radius-md)',
                     padding: '1.25rem',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '1rem',
-                    boxShadow: 'var(--shadow-sm)'
+                    boxShadow: isExpress ? '0 0 15px rgba(245, 158, 11, 0.2)' : 'var(--shadow-sm)'
                   }}
                 >
                   {/* Card Header: Index badge & Code */}
@@ -931,7 +971,7 @@ export function QueueTable() {
                         fontSize: '0.8rem',
                         fontWeight: 800,
                         backgroundColor: 'var(--bg-main)',
-                        color: 'var(--text-main)',
+                        color: isExpress ? '#fbbf24' : 'var(--text-main)',
                         border: '1px solid var(--border-color)'
                       }}>
                         #{index + 1}
@@ -956,7 +996,9 @@ export function QueueTable() {
                     </div>
 
                     {/* Status Badge */}
-                    {isFinished ? (
+                    {isExpress ? (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', backgroundColor: 'rgba(245, 158, 11, 0.22)', border: '1px solid rgba(251, 191, 36, 0.5)', padding: '0.25rem 0.65rem', borderRadius: '12px', boxShadow: '0 0 10px rgba(245, 158, 11, 0.35)' }}>⚡ ลัดคิว</span>
+                    ) : isFinished ? (
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '12px' }}>✓ เสร็จสิ้น</span>
                     ) : isCanceled ? (
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '12px' }}>✕ ยกเลิก</span>
@@ -1105,7 +1147,7 @@ export function QueueTable() {
                                 cursor: 'pointer'
                               }}
                               onClick={() => toggleExpressQueue(queueKey)}
-                              title={isExpress ? 'ซ่อนปุ่มยืนยัน' : 'ลัดคิว (แสดงปุ่มยืนยัน)'}
+                              title={isExpress ? 'ยกเลิกการลัดคิว' : 'ลัดคิว (แสดงปุ่มยืนยัน)'}
                             >
                               {isExpress ? '🔒' : '⚡'}
                             </button>

@@ -81,6 +81,8 @@ export function SendToQueueModal({
         style={{
           width: '100%',
           maxWidth: '460px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           backgroundColor: '#161922',
           border: '1px solid rgba(255, 255, 255, 0.15)',
           borderRadius: '18px',

@@ -220,7 +220,8 @@ function CheckQueueContent() {
           const isFinished = searchedItem.listStatus === 'finished';
           const isCanceled = searchedItem.listStatus === 'canceled';
           const isInQueue = searchedItem.listStatus === 'pending';
-          const isHold = searchedItem.listQueueId ? holdQueueIds[searchedItem.listQueueId] : holdQueueIds[searchedItem.id];
+          const queueKey = searchedItem.listQueueId || searchedItem.id;
+          const isHold = holdQueueIds[queueKey];
 
           return (
             <div className="card" style={{
@@ -240,7 +241,7 @@ function CheckQueueContent() {
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     รหัสคิวของคุณ
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary-red-hover)', marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--primary-red-hover)', fontFamily: 'monospace', marginTop: '0.25rem' }}>
                     {searchedItem.code}
                   </div>
                 </div>

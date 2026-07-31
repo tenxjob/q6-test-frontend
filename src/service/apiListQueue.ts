@@ -17,19 +17,41 @@ export interface ListQueueItem {
 import { API_BASE_URL } from '../config/api.config';
 
 export async function getPendingListQueues(): Promise<ListQueueItem[]> {
-  const response = await fetch(`${API_BASE_URL}/list-queues/pending`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch pending queues: ${response.statusText}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/list-queues/pending`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pending queues: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (Timeout)');
+    }
+    throw err;
   }
-  return response.json();
 }
 
 export async function getHistoryListQueues(): Promise<ListQueueItem[]> {
-  const response = await fetch(`${API_BASE_URL}/list-queues/history`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch queue history: ${response.statusText}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/list-queues/history`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch queue history: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (Timeout)');
+    }
+    throw err;
   }
-  return response.json();
 }
 
 export interface AddToListQueuePayload {

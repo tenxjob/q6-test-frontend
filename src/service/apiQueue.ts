@@ -25,13 +25,23 @@ export interface CreateQueueInput {
 import { API_BASE_URL, WS_URL } from '../config/api.config';
 
 export async function getQueues(): Promise<QueueItem[]> {
-  const response = await fetch(`${API_BASE_URL}/queues`);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch queues: ${response.statusText}`);
-  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  return response.json();
+  try {
+    const response = await fetch(`${API_BASE_URL}/queues`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch queues: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (Request Timeout)');
+    }
+    throw err;
+  }
 }
 
 export async function createQueue(data: CreateQueueInput): Promise<QueueItem> {
@@ -141,6 +151,8 @@ export function useGetQueues() {
     queryKey: ['queues'],
     queryFn: getQueues,
     staleTime: 5000,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 

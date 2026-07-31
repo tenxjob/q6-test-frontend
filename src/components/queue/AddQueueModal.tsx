@@ -66,6 +66,8 @@ export function AddQueueModal({ isOpen, onClose }: AddQueueModalProps) {
       <div className="card" style={{
         width: '100%',
         maxWidth: '460px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
         backgroundColor: 'var(--bg-surface)',
         border: '1px solid var(--border-color)',
         borderRadius: 'var(--radius-md)',
