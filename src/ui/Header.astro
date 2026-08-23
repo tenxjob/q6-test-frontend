@@ -2,6 +2,10 @@
 const pathname = Astro.url.pathname;
 const isQueue = pathname === '/queue' || pathname === '/queue/' || pathname === '/';
 const isCheckQueue = pathname.startsWith('/check-queue');
+const isPricebook = pathname.startsWith('/pricebook');
+const isPrice = pathname.startsWith('/price') && !pathname.startsWith('/pricebook');
+const isGame = pathname.startsWith('/game') && !pathname.startsWith('/game-price');
+const isGamePrice = pathname.startsWith('/game-price');
 ---
 
 <header class="app-header">
@@ -23,6 +27,30 @@ const isCheckQueue = pathname.startsWith('/check-queue');
                 class={`nav-link ${isCheckQueue ? "active" : ""}`}
             >
                 ตรวจสอบคิว
+            </a>
+            <a 
+                href="/pricebook" 
+                class={`nav-link ${isPricebook ? "active" : ""}`}
+            >
+                Pricebook
+            </a>
+            <a 
+                href="/price" 
+                class={`nav-link ${isPrice ? "active" : ""}`}
+            >
+                Price
+            </a>
+            <a 
+                href="/game" 
+                class={`nav-link ${isGame ? "active" : ""}`}
+            >
+                Game
+            </a>
+            <a 
+                href="/game-price" 
+                class={`nav-link ${isGamePrice ? "active" : ""}`}
+            >
+                Game Price
             </a>
         </nav>
 
