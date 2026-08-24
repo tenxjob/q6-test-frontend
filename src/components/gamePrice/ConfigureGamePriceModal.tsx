@@ -36,11 +36,11 @@ export function ConfigureGamePriceModal({
   const filteredMasterPrices = useMemo(() => {
     return allMasterPrices.filter((p) => {
       if (!p.isUse) return false; // only active master tiers
+      if (p.usd === null || p.usd === undefined) return false; // only ID_PASS master tiers with USD
       if (!searchTerm) return true;
-      return (
-        p.usd.toString().includes(searchTerm) ||
-        (p.roundedUsd && p.roundedUsd.toString().includes(searchTerm))
-      );
+      const usdStr = p.usd != null ? p.usd.toString() : '';
+      const roundedStr = p.roundedUsd != null ? p.roundedUsd.toString() : '';
+      return usdStr.includes(searchTerm) || roundedStr.includes(searchTerm);
     });
   }, [allMasterPrices, searchTerm]);
 
@@ -397,7 +397,8 @@ export function ConfigureGamePriceModal({
             ) : (
               filteredMasterPrices.map((p) => {
                 const isSelected = selectedPackIds.includes(p.id);
-                const roundedVal = p.roundedUsd ?? Math.round(p.usd);
+                const usdNum = Number(p.usd) || 0;
+                const roundedVal = p.roundedUsd != null ? Number(p.roundedUsd) : Math.round(usdNum);
                 const calculatedPrice = Math.round(roundedVal * (Number(rate) || 31));
 
                 return (
@@ -439,7 +440,7 @@ export function ConfigureGamePriceModal({
                             fontFamily: 'monospace',
                           }}
                         >
-                          ${p.usd.toFixed(2)}
+                          ${usdNum.toFixed(2)}
                         </span>
                       </div>
 
